@@ -47,6 +47,7 @@ PANDAS_MEDIA_FOLDER="${PANDAS_MEDIA_FOLDER:-$HOME/social-media}"
 | History | View recent posts and their statuses |
 | Detail | Check a specific post's full details |
 | Retry | Retry a failed post |
+| Delete | Delete a scheduled or failed post |
 
 ## Publish Flow
 
@@ -273,6 +274,40 @@ curl -s -X POST "$PANDAS_API_URL/posts/POST_ID/retry" \
 ```
 
 Only posts with `failed` status can be retried. If the post is not in a failed state, the API will return a 404.
+
+## Delete Flow
+
+Delete a scheduled or failed post. Only posts with `scheduled` or `failed` status can be deleted — published posts cannot be removed.
+
+### Step 1: Identify the Post
+
+Use the **Detail** flow to fetch the post and confirm its status is `scheduled` or `failed`. Show the post summary to the user and ask for confirmation:
+
+> Are you sure you want to delete this post?
+> Content: [first 100 chars...]
+> Status: scheduled
+> Platforms: Twitter, Bluesky
+
+### Step 2: Send Delete Request
+
+```bash
+curl -s -X DELETE "$PANDAS_API_URL/posts/POST_ID" \
+  -H "Authorization: Bearer $PANDAS_API_KEY" \
+  -H "Accept: application/json"
+```
+
+**Response (200):**
+```json
+{
+  "message": "Post deleted."
+}
+```
+
+### Step 3: Display Confirmation
+
+Show: "Post #POST_ID has been deleted."
+
+If the API returns 404, the post either doesn't exist or is in a non-deletable status (e.g., published). Inform the user accordingly.
 
 ## Platform Reference Table
 
