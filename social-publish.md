@@ -8,22 +8,22 @@ metadata:
 
 # Social Publish
 
-Publish social media posts to connected platforms via the Zebras API from Claude Code.
+Publish social media posts to connected platforms via the Nosy Pandas API from Claude Code.
 
 ## Configuration
 
-Configuration is stored in `~/.zebras` as simple key=value pairs:
+Configuration is stored in `~/.pandas` as simple key=value pairs:
 
 ```
-api_url=https://zebras.test/api
+api_url=https://nosypandas.com/api
 api_key=your-key-here
 media_folder=~/social-media
 ```
 
 If this file doesn't exist or is missing values, the skill will walk the user through setup:
-1. Ask for their Zebras URL (e.g. `https://zebras.test`)
+1. Ask for their Nosy Pandas URL (e.g. `https://nosypandas.com`)
 2. Ask them to paste their API key (generated from the dashboard under API Keys)
-3. Write `~/.zebras` automatically
+3. Write `~/.pandas` automatically
 
 The user can also just paste their API key directly in chat at any time — the skill should detect it and offer to save it.
 
@@ -33,10 +33,10 @@ The user can also just paste their API key directly in chat at any time — the 
 
 ```bash
 # Read config values (use these instead of env vars in all curl commands)
-ZEBRAS_API_URL=$(grep '^api_url=' ~/.zebras 2>/dev/null | cut -d= -f2-)
-ZEBRAS_API_KEY=$(grep '^api_key=' ~/.zebras 2>/dev/null | cut -d= -f2-)
-ZEBRAS_MEDIA_FOLDER=$(grep '^media_folder=' ~/.zebras 2>/dev/null | cut -d= -f2-)
-ZEBRAS_MEDIA_FOLDER="${ZEBRAS_MEDIA_FOLDER:-$HOME/social-media}"
+PANDAS_API_URL=$(grep '^api_url=' ~/.pandas 2>/dev/null | cut -d= -f2-)
+PANDAS_API_KEY=$(grep '^api_key=' ~/.pandas 2>/dev/null | cut -d= -f2-)
+PANDAS_MEDIA_FOLDER=$(grep '^media_folder=' ~/.pandas 2>/dev/null | cut -d= -f2-)
+PANDAS_MEDIA_FOLDER="${PANDAS_MEDIA_FOLDER:-$HOME/social-media}"
 ```
 
 ## Available Commands
@@ -54,28 +54,28 @@ Follow these steps in order:
 
 ### Step 1: Verify Configuration
 
-Read `~/.zebras` and check that `api_url` and `api_key` are present.
+Read `~/.pandas` and check that `api_url` and `api_key` are present.
 
 If the file doesn't exist or is missing values:
-1. Ask: "What's your Zebras URL?" (e.g. `https://zebras.test`)
+1. Ask: "What's your Nosy Pandas URL?" (e.g. `https://nosypandas.com`)
 2. Ask: "Paste your API key" (tell them to generate one from the dashboard under API Keys)
-3. Write the values to `~/.zebras`:
+3. Write the values to `~/.pandas`:
 ```bash
-cat > ~/.zebras << 'EOF'
-api_url=https://zebras.test/api
+cat > ~/.pandas << 'EOF'
+api_url=https://nosypandas.com/api
 api_key=the-pasted-key
 media_folder=~/social-media
 EOF
-chmod 600 ~/.zebras
+chmod 600 ~/.pandas
 ```
 
-If the user pastes what looks like an API key without being asked, detect it and offer to save it to `~/.zebras`.
+If the user pastes what looks like an API key without being asked, detect it and offer to save it to `~/.pandas`.
 
 ### Step 2: Fetch Connected Accounts
 
 ```bash
-curl -s "$ZEBRAS_API_URL/accounts" \
-  -H "Authorization: Bearer $ZEBRAS_API_KEY" \
+curl -s "$PANDAS_API_URL/accounts" \
+  -H "Authorization: Bearer $PANDAS_API_KEY" \
   -H "Accept: application/json"
 ```
 
@@ -120,7 +120,7 @@ If content exceeds LinkedIn's 3000 character hard limit, warn the user and ask t
 Scan the configured media folder using `find`:
 
 ```bash
-MEDIA_DIR="${ZEBRAS_MEDIA_FOLDER:-$HOME/social-media}"
+MEDIA_DIR="${PANDAS_MEDIA_FOLDER:-$HOME/social-media}"
 find "$MEDIA_DIR" -maxdepth 1 -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.gif" -o -iname "*.webp" -o -iname "*.mp4" -o -iname "*.mov" -o -iname "*.avi" -o -iname "*.webm" \) 2>/dev/null
 ```
 
@@ -162,8 +162,8 @@ Ask: "Look good? (yes/no)"
 Send the request. **Do not** manually set `Content-Type` — curl sets it automatically with `-F`:
 
 ```bash
-curl -s -X POST "$ZEBRAS_API_URL/posts" \
-  -H "Authorization: Bearer $ZEBRAS_API_KEY" \
+curl -s -X POST "$PANDAS_API_URL/posts" \
+  -H "Authorization: Bearer $PANDAS_API_KEY" \
   -H "Accept: application/json" \
   -F "content=POST_CONTENT" \
   -F "platforms[]=ACCOUNT_ID_1" \
@@ -205,7 +205,7 @@ Show the result per platform:
 After successful posting, move used media files to a `posted/` subfolder:
 
 ```bash
-MEDIA_DIR="${ZEBRAS_MEDIA_FOLDER:-$HOME/social-media}"
+MEDIA_DIR="${PANDAS_MEDIA_FOLDER:-$HOME/social-media}"
 mkdir -p "$MEDIA_DIR/posted/"
 mv "$MEDIA_DIR/used-file.jpg" "$MEDIA_DIR/posted/"
 ```
@@ -215,8 +215,8 @@ mv "$MEDIA_DIR/used-file.jpg" "$MEDIA_DIR/posted/"
 Fetch recent posts:
 
 ```bash
-curl -s "$ZEBRAS_API_URL/posts" \
-  -H "Authorization: Bearer $ZEBRAS_API_KEY" \
+curl -s "$PANDAS_API_URL/posts" \
+  -H "Authorization: Bearer $PANDAS_API_KEY" \
   -H "Accept: application/json"
 ```
 
@@ -227,8 +227,8 @@ Returns paginated posts with platform statuses. Display as a table showing post 
 Check a specific post's full details:
 
 ```bash
-curl -s "$ZEBRAS_API_URL/posts/POST_ID" \
-  -H "Authorization: Bearer $ZEBRAS_API_KEY" \
+curl -s "$PANDAS_API_URL/posts/POST_ID" \
+  -H "Authorization: Bearer $PANDAS_API_KEY" \
   -H "Accept: application/json"
 ```
 
@@ -257,8 +257,8 @@ curl -s "$ZEBRAS_API_URL/posts/POST_ID" \
 Retry a failed post:
 
 ```bash
-curl -s -X POST "$ZEBRAS_API_URL/posts/POST_ID/retry" \
-  -H "Authorization: Bearer $ZEBRAS_API_KEY" \
+curl -s -X POST "$PANDAS_API_URL/posts/POST_ID/retry" \
+  -H "Authorization: Bearer $PANDAS_API_KEY" \
   -H "Accept: application/json"
 ```
 
@@ -298,7 +298,7 @@ Only posts with `failed` status can be retried. If the post is not in a failed s
 
 | Status | Meaning | Recovery |
 |--------|---------|----------|
-| 401 | Invalid API key | Check `api_key` in `~/.zebras` is correct |
+| 401 | Invalid API key | Check `api_key` in `~/.pandas` is correct |
 | 403 | Subscription required | Subscribe at the dashboard |
 | 404 | Post not found or not retryable | Verify the post ID and that its status is `failed` |
 | 422 | Validation error | Show the specific error messages from the response body and help the user fix them |
