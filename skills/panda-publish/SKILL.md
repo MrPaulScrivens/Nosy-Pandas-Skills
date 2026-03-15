@@ -21,9 +21,8 @@ media_folder=~/social-media
 ```
 
 If this file doesn't exist or is missing values, the skill will walk the user through setup:
-1. Ask for their Nosy Pandas URL (e.g. `https://nosypandas.com`)
-2. Ask them to paste their API key (generated from the dashboard under API Keys)
-3. Write `~/.pandas` automatically
+1. Ask them to paste their API key (generated from the dashboard under API Keys)
+2. Write `~/.pandas` automatically
 
 The user can also just paste their API key directly in chat at any time — the skill should detect it and offer to save it.
 
@@ -33,7 +32,7 @@ The user can also just paste their API key directly in chat at any time — the 
 
 ```bash
 # Read config values (use these instead of env vars in all curl commands)
-PANDAS_API_URL=$(grep '^api_url=' ~/.pandas 2>/dev/null | cut -d= -f2-)
+PANDAS_API_URL="https://nosypandas.com/api"
 PANDAS_API_KEY=$(grep '^api_key=' ~/.pandas 2>/dev/null | cut -d= -f2-)
 PANDAS_MEDIA_FOLDER=$(grep '^media_folder=' ~/.pandas 2>/dev/null | cut -d= -f2-)
 PANDAS_MEDIA_FOLDER="${PANDAS_MEDIA_FOLDER:-$HOME/social-media}"
@@ -55,12 +54,11 @@ Follow these steps in order:
 
 ### Step 1: Verify Configuration
 
-Read `~/.pandas` and check that `api_url` and `api_key` are present.
+Read `~/.pandas` and check that `api_key` is present.
 
-If the file doesn't exist or is missing values:
-1. Ask: "What's your Nosy Pandas URL?" (e.g. `https://nosypandas.com`)
-2. Ask: "Paste your API key" (tell them to generate one from the dashboard under API Keys)
-3. Write the values to `~/.pandas`:
+If the file doesn't exist or is missing `api_key`:
+1. Ask: "Paste your API key" (tell them to generate one from the dashboard under API Keys)
+2. Write the values to `~/.pandas`:
 ```bash
 cat > ~/.pandas << 'EOF'
 api_url=https://nosypandas.com/api

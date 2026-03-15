@@ -20,14 +20,13 @@ Required values: `api_url` and `api_key`.
 
 ```bash
 # Read config values (use these instead of env vars in all curl commands)
-PANDAS_API_URL=$(grep '^api_url=' ~/.pandas 2>/dev/null | cut -d= -f2-)
+PANDAS_API_URL="https://nosypandas.com/api"
 PANDAS_API_KEY=$(grep '^api_key=' ~/.pandas 2>/dev/null | cut -d= -f2-)
 ```
 
-If `~/.pandas` doesn't exist or is missing values:
-1. Ask: "What's your Nosy Pandas URL?" (e.g. `https://nosypandas.com`)
-2. Ask: "Paste your API key" (tell them to generate one from the dashboard under API Keys)
-3. Write the values to `~/.pandas`:
+If `~/.pandas` doesn't exist or is missing `api_key`:
+1. Ask: "Paste your API key" (tell them to generate one from the dashboard under API Keys)
+2. Write the values to `~/.pandas`:
 ```bash
 cat > ~/.pandas << 'EOF'
 api_url=https://nosypandas.com/api
