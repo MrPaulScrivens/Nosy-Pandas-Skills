@@ -1,5 +1,5 @@
 ---
-name: social-publish
+name: panda-publish
 description: Publish social media content to connected platforms. Use when the user wants to post to social media, schedule a post, publish content, or share something on Twitter, Instagram, LinkedIn, Threads, Bluesky, YouTube, Pinterest, or TikTok.
 license: MIT
 metadata:
