@@ -239,12 +239,38 @@ Optional fields (add to JSON when applicable):
 }
 ```
 
+### Step 9c: Poll for Final Status
+
+Some platforms (especially Threads) take time to process posts. The create response may show `failed` with no error, `pending`, or `publishing` — these are non-terminal statuses that may resolve on their own. **Long threads (5+ parts) can take several minutes** because Meta processes each container sequentially.
+
+After creating the post, check if any platform in the response has a non-terminal status:
+- `pending`, `publishing`, or `failed` with `null`/missing error
+
+If so, determine the poll count based on content:
+- **Threads with threaded content** (content exceeded 500 chars and was auto-split): poll up to **12 times** with **10-second** waits (2 minutes total)
+- **All other cases**: poll up to **4 times** with **5-second** waits (20 seconds total)
+
+```bash
+# Wait, then check updated status
+sleep $POLL_INTERVAL
+curl -s "$PANDAS_API_URL/posts/POST_ID" \
+  -H "Authorization: Bearer $PANDAS_API_KEY" \
+  -H "Accept: application/json"
+```
+
+**Stop polling early** if all platforms have reached a terminal status:
+- `published` (success)
+- `failed` with a non-null error message (genuine failure)
+
+After polling completes (or stops early), proceed to Step 10 with whatever status we have. If a platform still shows `failed` with no error after all polls, display it as "Still processing" rather than a hard failure — the server will continue checking in the background and update the status automatically.
+
 ### Step 10: Display Results
 
 Show the result per platform:
 - Success: "Twitter/X: Published — https://x.com/..."
 - Pending: "LinkedIn: Pending — check back shortly"
 - Failed: "Instagram: Failed — Instagram requires media."
+- Still processing: "Threads: Still processing — the server is still checking and will update the status automatically. Use the Detail command to check later."
 
 ### Step 11: Move Media
 
