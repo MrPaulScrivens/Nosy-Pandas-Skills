@@ -52,7 +52,43 @@ PANDAS_MEDIA_FOLDER="${PANDAS_MEDIA_FOLDER:-$HOME/social-media}"
 
 Follow these steps in order:
 
-### Step 1: Verify Configuration
+### Step 0: Permission Setup (first run only)
+
+Check if the user's Claude Code permissions already include the skill's bash patterns:
+
+```bash
+grep -q "nosypandas.com" ~/.claude/settings.json 2>/dev/null && echo "CONFIGURED" || echo "NOT_CONFIGURED"
+```
+
+If `CONFIGURED`, skip to Step 1.
+
+If `NOT_CONFIGURED`, explain to the user:
+
+> **Quick setup:** This skill runs bash commands to call the Nosy Pandas API, read your config, scan for media files, and move them after posting. By default, Claude Code asks you to approve each one — that's 6-11 prompts every time you publish.
+>
+> I can add permission patterns to your Claude Code settings (`~/.claude/settings.json`) so these commands auto-approve. The patterns are scoped narrowly:
+> - API calls only to `nosypandas.com`
+> - Config reads/writes only to `~/.pandas`
+> - File operations only in your `social-media/` folder
+>
+> Want me to set this up?
+
+If the user agrees, read `~/.claude/settings.json`, merge these patterns into the `permissions.allow` array (avoiding duplicates), and write it back:
+
+```json
+"Bash(cat > ~/.pandas *)",
+"Bash(chmod 600 ~/.pandas)",
+"Bash(grep * ~/.pandas *)",
+"Bash(find * social-media *)",
+"Bash(curl * https://nosypandas.com/*)",
+"Bash(sleep *)",
+"Bash(mkdir -p * social-media/*)",
+"Bash(mv * social-media/*)"
+```
+
+If the user declines, proceed normally — they'll just see approval prompts for each command.
+
+### Step 1: Verify Configuration & Fetch Accounts
 
 Read `~/.pandas` and check that `api_key` is present.
 
@@ -70,10 +106,11 @@ chmod 600 ~/.pandas
 
 If the user pastes what looks like an API key without being asked, detect it and offer to save it to `~/.pandas`.
 
-### Step 2: Fetch Connected Accounts
+Once config is confirmed, read config and fetch accounts in a single call:
 
 ```bash
-curl -s "$PANDAS_API_URL/accounts" \
+PANDAS_API_KEY=$(grep '^api_key=' ~/.pandas 2>/dev/null | cut -d= -f2-) && \
+curl -s "https://nosypandas.com/api/accounts" \
   -H "Authorization: Bearer $PANDAS_API_KEY" \
   -H "Accept: application/json"
 ```
@@ -161,21 +198,77 @@ Ask: "Look good? (yes/no)"
 
 This step has two parts: stage media (if any), then create the post.
 
-#### Step 9a: Stage Media
+#### Step 9a: Stage Media, Create Post & Check Status
 
-For each selected media file, upload it to the staging endpoint. The server handles all cloud storage interaction internally.
+Run all of media staging, post creation, and status checking in a **single bash call**. The script stages each file, collects tokens, creates the post, and (if needed) waits 5s to recheck status.
+
+For posts **with media**:
 
 ```bash
-# Stage each file — returns a short-lived token
-STAGE_RESULT=$(curl -s -X POST "$PANDAS_API_URL/media/stage" \
+PANDAS_API_KEY=$(grep '^api_key=' ~/.pandas 2>/dev/null | cut -d= -f2-) && \
+PANDAS_API_URL="https://nosypandas.com/api" && \
+TOKENS="" && \
+for FILE in /path/to/file1.jpg /path/to/file2.png; do \
+  RESULT=$(curl -s -X POST "$PANDAS_API_URL/media/stage" \
+    -H "Authorization: Bearer $PANDAS_API_KEY" \
+    -H "Accept: application/json" \
+    -F "file=@$FILE") && \
+  T=$(echo "$RESULT" | jq -r '.token') && \
+  TOKENS="${TOKENS:+$TOKENS,}\"$T\""; \
+done && \
+POST_RESULT=$(curl -s -X POST "$PANDAS_API_URL/posts" \
   -H "Authorization: Bearer $PANDAS_API_KEY" \
   -H "Accept: application/json" \
-  -F "file=@/path/to/file.jpg")
-
-TOKEN=$(echo "$STAGE_RESULT" | jq -r '.token')
+  -H "Content-Type: application/json" \
+  -d "{
+    \"content\": \"POST_CONTENT\",
+    \"platforms\": [ACCOUNT_ID_1, ACCOUNT_ID_2],
+    \"publish_now\": true,
+    \"media_tokens\": [$TOKENS]
+  }") && \
+echo "$POST_RESULT" && \
+POST_ID=$(echo "$POST_RESULT" | jq -r '.post.id') && \
+HAS_PENDING=$(echo "$POST_RESULT" | jq '[.post.platforms[] | select(.status == "pending" or .status == "publishing" or (.status == "failed" and (.error == null or .error == "")))] | length') && \
+if [ "$HAS_PENDING" -gt 0 ]; then \
+  sleep 5 && \
+  curl -s "$PANDAS_API_URL/posts/$POST_ID" \
+    -H "Authorization: Bearer $PANDAS_API_KEY" \
+    -H "Accept: application/json"; \
+fi
 ```
 
-**Response (201):**
+For posts **without media**:
+
+```bash
+PANDAS_API_KEY=$(grep '^api_key=' ~/.pandas 2>/dev/null | cut -d= -f2-) && \
+PANDAS_API_URL="https://nosypandas.com/api" && \
+POST_RESULT=$(curl -s -X POST "$PANDAS_API_URL/posts" \
+  -H "Authorization: Bearer $PANDAS_API_KEY" \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "POST_CONTENT",
+    "platforms": [ACCOUNT_ID_1, ACCOUNT_ID_2],
+    "publish_now": true
+  }') && \
+echo "$POST_RESULT" && \
+POST_ID=$(echo "$POST_RESULT" | jq -r '.post.id') && \
+HAS_PENDING=$(echo "$POST_RESULT" | jq '[.post.platforms[] | select(.status == "pending" or .status == "publishing" or (.status == "failed" and (.error == null or .error == "")))] | length') && \
+if [ "$HAS_PENDING" -gt 0 ]; then \
+  sleep 5 && \
+  curl -s "$PANDAS_API_URL/posts/$POST_ID" \
+    -H "Authorization: Bearer $PANDAS_API_KEY" \
+    -H "Accept: application/json"; \
+fi
+```
+
+Optional fields (add to the JSON when applicable):
+- `"title": "VIDEO_TITLE"` — for YouTube
+- `"link_url": "https://example.com"` — for Pinterest
+- `"scheduled_at": "2026-03-16T09:00:00Z"` — for scheduled posts (omit `publish_now` or set to `false`)
+- `"timezone": "America/New_York"` — timezone for scheduled posts
+
+**Stage response (201):**
 ```json
 {
   "token": "stg_abc123...",
@@ -185,46 +278,9 @@ TOKEN=$(echo "$STAGE_RESULT" | jq -r '.token')
 }
 ```
 
-Tokens are valid for 2 hours. Collect all tokens for the post creation step.
+Tokens are valid for 2 hours.
 
-#### Step 9b: Create Post
-
-If **media was staged**, include `media_tokens` in the JSON:
-
-```bash
-curl -s -X POST "$PANDAS_API_URL/posts" \
-  -H "Authorization: Bearer $PANDAS_API_KEY" \
-  -H "Accept: application/json" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "content": "POST_CONTENT",
-    "platforms": [ACCOUNT_ID_1, ACCOUNT_ID_2],
-    "publish_now": true,
-    "media_tokens": ["stg_TOKEN_1", "stg_TOKEN_2"]
-  }'
-```
-
-If **no media**, omit `media_tokens`:
-
-```bash
-curl -s -X POST "$PANDAS_API_URL/posts" \
-  -H "Authorization: Bearer $PANDAS_API_KEY" \
-  -H "Accept: application/json" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "content": "POST_CONTENT",
-    "platforms": [ACCOUNT_ID_1, ACCOUNT_ID_2],
-    "publish_now": true
-  }'
-```
-
-Optional fields (add to JSON when applicable):
-- `"title": "VIDEO_TITLE"` — for YouTube
-- `"link_url": "https://example.com"` — for Pinterest
-- `"scheduled_at": "2026-03-16T09:00:00Z"` — for scheduled posts (omit `publish_now` or set to `false`)
-- `"timezone": "America/New_York"` — timezone for scheduled posts
-
-**Response (201):**
+**Post response (201):**
 ```json
 {
   "post": {
@@ -239,20 +295,7 @@ Optional fields (add to JSON when applicable):
 }
 ```
 
-### Step 9c: Check Final Status
-
-Some platforms (especially Threads) take time to process posts. The create response may show `pending`, `publishing`, or `failed` with no error — these are non-terminal statuses that the server resolves automatically via background jobs and webhooks.
-
-After creating the post, check if any platform has a non-terminal status (`pending`, `publishing`, or `failed` with `null`/missing error). If so, do **one** check after 5 seconds:
-
-```bash
-sleep 5
-curl -s "$PANDAS_API_URL/posts/POST_ID" \
-  -H "Authorization: Bearer $PANDAS_API_KEY" \
-  -H "Accept: application/json"
-```
-
-Proceed to Step 10 with whatever status we have after this single check. Do not loop or retry — the server handles verification in the background and webhooks deliver the final status.
+Some platforms (especially Threads) take time to process. The script automatically does one 5-second recheck if any platform has a non-terminal status (`pending`, `publishing`, or `failed` with no error). Do not add additional retries — the server handles verification via background jobs and webhooks.
 
 ### Step 10: Display Results
 
@@ -264,13 +307,15 @@ Show the result per platform:
 
 ### Step 11: Move Media
 
-After successful posting, move used media files to a `posted/` subfolder:
+After successful posting, move all used media files to a `posted/` subfolder in a single call:
 
 ```bash
-MEDIA_DIR="${PANDAS_MEDIA_FOLDER:-$HOME/social-media}"
-mkdir -p "$MEDIA_DIR/posted/"
-mv "$MEDIA_DIR/used-file.jpg" "$MEDIA_DIR/posted/"
+MEDIA_DIR="${PANDAS_MEDIA_FOLDER:-$HOME/social-media}" && \
+mkdir -p "$MEDIA_DIR/posted/" && \
+mv "$MEDIA_DIR/file1.jpg" "$MEDIA_DIR/file2.png" "$MEDIA_DIR/posted/"
 ```
+
+List all used files as arguments to a single `mv` command.
 
 ## Post History Flow
 
