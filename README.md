@@ -11,9 +11,20 @@ Claude Code skills for the [Nosy Pandas](https://nosypandas.com) social media sc
 
 ## Installation
 
+Install each skill as a Claude Code plugin:
+
 ```bash
-npx @anthropic-ai/claude-code skills add /path/to/Nosy-Pandas-Skills/skills/panda-publish
-npx @anthropic-ai/claude-code skills add /path/to/Nosy-Pandas-Skills/skills/panda-analytics
+claude plugin install panda-publish
+claude plugin install panda-analytics
+```
+
+### Updating
+
+To get the latest version of a skill:
+
+```bash
+claude plugin update panda-publish
+claude plugin update panda-analytics
 ```
 
 ## Configuration
