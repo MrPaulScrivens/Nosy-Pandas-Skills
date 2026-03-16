@@ -191,6 +191,7 @@ Link URL: [if Pinterest]
 
 Warnings:
 - Twitter: Content will be split into a thread (exceeds 280 chars)
+- Threads: Posts take a few minutes to fully process on Meta's platform — the skill will show "Submitted" after posting. Use the Detail command to confirm the final status.
 ```
 
 Ask: "Look good? (yes/no)"
@@ -229,7 +230,7 @@ POST_RESULT=$(curl -s -X POST "$PANDAS_API_URL/posts" \
   }") && \
 echo "$POST_RESULT" && \
 POST_ID=$(echo "$POST_RESULT" | jq -r '.post.id') && \
-HAS_PENDING=$(echo "$POST_RESULT" | jq '[.post.platforms[] | select(.status == "pending" or .status == "publishing" or (.status == "failed" and (.error == null or .error == "")))] | length') && \
+HAS_PENDING=$(echo "$POST_RESULT" | jq '[.post.platforms[] | select(.status == "pending" or .status == "publishing" or (.status == "failed" and (.error == null or .error == "" or .error == "Publishing failed (no details provided by platform)")))] | length') && \
 if [ "$HAS_PENDING" -gt 0 ]; then \
   sleep 5 && \
   curl -s "$PANDAS_API_URL/posts/$POST_ID" \
@@ -254,7 +255,7 @@ POST_RESULT=$(curl -s -X POST "$PANDAS_API_URL/posts" \
   }') && \
 echo "$POST_RESULT" && \
 POST_ID=$(echo "$POST_RESULT" | jq -r '.post.id') && \
-HAS_PENDING=$(echo "$POST_RESULT" | jq '[.post.platforms[] | select(.status == "pending" or .status == "publishing" or (.status == "failed" and (.error == null or .error == "")))] | length') && \
+HAS_PENDING=$(echo "$POST_RESULT" | jq '[.post.platforms[] | select(.status == "pending" or .status == "publishing" or (.status == "failed" and (.error == null or .error == "" or .error == "Publishing failed (no details provided by platform)")))] | length') && \
 if [ "$HAS_PENDING" -gt 0 ]; then \
   sleep 5 && \
   curl -s "$PANDAS_API_URL/posts/$POST_ID" \
@@ -296,15 +297,18 @@ Tokens are valid for 2 hours.
 }
 ```
 
-Some platforms (especially Threads) take time to process. The script automatically does one 5-second recheck if any platform has a non-terminal status (`pending`, `publishing`, or `failed` with no error). Do not add additional retries — the server handles verification via background jobs and webhooks.
+Some platforms (especially Threads) take time to process. The script automatically does one 5-second recheck if any platform has a non-terminal status (`pending`, `publishing`, or `failed` with no error details). The generic error string `"Publishing failed (no details provided by platform)"` also counts as non-terminal — it means the platform is still processing, not that it actually failed. Do not add additional retries — the server handles final status updates via background jobs and webhooks.
 
 ### Step 10: Display Results
 
-Show the result per platform:
-- Success: "Twitter/X: Published — https://x.com/..."
-- Pending: "LinkedIn: Pending — check back shortly"
-- Failed: "Instagram: Failed — Instagram requires media."
-- Still processing: "Threads: Still processing — check your dashboard for the final status."
+Show the result per platform using these rules, evaluated in order:
+
+1. **Published** — status is `published`: "[Platform]: Published — [url]"
+2. **Pending/Processing** — status is `pending` or `publishing`: "[Platform]: Pending — check back shortly"
+3. **Threads submitted (not a real failure)** — platform is `threads`, status is `failed`, AND error is null, empty, OR `"Publishing failed (no details provided by platform)"`: "Threads: Submitted — this platform takes a few minutes to fully process. Use the Detail command to confirm the final status."
+4. **Failed with real error** — status is `failed` with a specific, non-generic error message: "[Platform]: Failed — [error message]"
+
+**Critical rule:** NEVER display "Failed" for Threads if the error is null, empty, or the generic string `"Publishing failed (no details provided by platform)"`. Only show "Failed" for Threads when there is a specific, actionable error (e.g., "Account not found", "Content policy violation").
 
 ### Step 11: Move Media
 
