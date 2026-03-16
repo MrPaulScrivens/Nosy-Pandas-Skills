@@ -2,6 +2,7 @@
 name: panda-analytics
 description: View social media analytics and insights. Use when the user wants to check post performance, engagement metrics, best posting times, follower stats, content decay, posting frequency, or any analytics data from their connected platforms.
 license: MIT
+version: 0.1.0
 metadata:
   author: nosypanda
 ---
