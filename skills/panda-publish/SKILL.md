@@ -373,7 +373,7 @@ If the API returns 404, the post either doesn't exist or is in a non-deletable s
 |----------|------------|-----------|----------------|----------------|------------|------------|--------|
 | Twitter/X | 280 chars | Yes | No | No | 4 | 1 | Yes |
 | Bluesky | 300 chars | Yes | No | No | 4 | 1 | No |
-| Threads | None | Yes | No | No | 10 | 1 | No |
+| Threads | 500 chars | Yes | No | No | 10 | 1 | No |
 | Instagram | None | No | Yes | No | 10 | 1 | No |
 | LinkedIn | 3000 chars | No | No | No | 20 | 1 | No |
 | YouTube | None | No | Yes | Yes | 0 | 1 | No |
