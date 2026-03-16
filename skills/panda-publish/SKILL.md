@@ -131,6 +131,7 @@ If files are found, list them (distinguishing images vs videos by extension) and
 - If a selected platform **requires video** (YouTube, TikTok) and only images are attached, warn the user that video is required.
 - Check media counts against the Platform Reference Table limits below and warn about any violations.
 - If a platform has `noMix: true` and both images and videos are selected, warn the user.
+- Accepted file types: jpg, jpeg, png, gif, webp (images); mp4, mov, avi, webm (videos).
 
 ### Step 7: Schedule or Publish Now
 
@@ -158,48 +159,37 @@ Ask: "Look good? (yes/no)"
 
 ### Step 9: Execute Post
 
-This step has two parts: upload media (if any), then create the post.
+This step has two parts: stage media (if any), then create the post.
 
-#### Step 9a: Upload Media
+#### Step 9a: Stage Media
 
-For each selected media file, get a presigned URL and upload directly (bypasses server size limits):
+For each selected media file, upload it to the staging endpoint. The server handles all cloud storage interaction internally.
 
 ```bash
-# Get presigned URL for each file
-PRESIGN=$(curl -s -X POST "$PANDAS_API_URL/media/presign" \
+# Stage each file — returns a short-lived token
+STAGE_RESULT=$(curl -s -X POST "$PANDAS_API_URL/media/stage" \
   -H "Authorization: Bearer $PANDAS_API_KEY" \
   -H "Accept: application/json" \
-  -H "Content-Type: application/json" \
-  -d '{"filename": "FILENAME", "content_type": "MIME_TYPE"}')
+  -F "file=@/path/to/file.jpg")
 
-UPLOAD_URL=$(echo "$PRESIGN" | jq -r '.upload_url')
-PUBLIC_URL=$(echo "$PRESIGN" | jq -r '.public_url')
-
-# Upload directly to presigned URL (bypasses server entirely)
-curl -s -X PUT "$UPLOAD_URL" \
-  -H "Content-Type: MIME_TYPE" \
-  --data-binary @/path/to/file
+TOKEN=$(echo "$STAGE_RESULT" | jq -r '.token')
 ```
 
-Determine the MIME type from the file extension:
-- `.jpg`, `.jpeg` → `image/jpeg`
-- `.png` → `image/png`
-- `.gif` → `image/gif`
-- `.webp` → `image/webp`
-- `.mp4` → `video/mp4`
-- `.mov` → `video/quicktime`
-- `.avi` → `video/x-msvideo`
-- `.webm` → `video/webm`
+**Response (201):**
+```json
+{
+  "token": "stg_abc123...",
+  "original_filename": "photo.jpg",
+  "type": "image",
+  "expires_at": "2026-03-16T14:00:00+00:00"
+}
+```
 
-Determine the media type from the MIME type:
-- Starts with `video/` → `video`
-- Otherwise → `image`
-
-Collect the `PUBLIC_URL`, type, and original filename for each uploaded file.
+Tokens are valid for 2 hours. Collect all tokens for the post creation step.
 
 #### Step 9b: Create Post
 
-If **media was uploaded**, use JSON with `media_urls`:
+If **media was staged**, include `media_tokens` in the JSON:
 
 ```bash
 curl -s -X POST "$PANDAS_API_URL/posts" \
@@ -210,14 +200,11 @@ curl -s -X POST "$PANDAS_API_URL/posts" \
     "content": "POST_CONTENT",
     "platforms": [ACCOUNT_ID_1, ACCOUNT_ID_2],
     "publish_now": true,
-    "media_urls": [
-      {"url": "PUBLIC_URL_1", "type": "image", "original_filename": "photo.jpg"},
-      {"url": "PUBLIC_URL_2", "type": "video", "original_filename": "video.mp4"}
-    ]
+    "media_tokens": ["stg_TOKEN_1", "stg_TOKEN_2"]
   }'
 ```
 
-If **no media**, use JSON without `media_urls`:
+If **no media**, omit `media_tokens`:
 
 ```bash
 curl -s -X POST "$PANDAS_API_URL/posts" \
