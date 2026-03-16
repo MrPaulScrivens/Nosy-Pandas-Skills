@@ -158,24 +158,84 @@ Ask: "Look good? (yes/no)"
 
 ### Step 9: Execute Post
 
-Send the request. **Do not** manually set `Content-Type` — curl sets it automatically with `-F`:
+This step has two parts: upload media (if any), then create the post.
+
+#### Step 9a: Upload Media
+
+For each selected media file, get a presigned URL and upload directly (bypasses server size limits):
+
+```bash
+# Get presigned URL for each file
+PRESIGN=$(curl -s -X POST "$PANDAS_API_URL/media/presign" \
+  -H "Authorization: Bearer $PANDAS_API_KEY" \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{"filename": "FILENAME", "content_type": "MIME_TYPE"}')
+
+UPLOAD_URL=$(echo "$PRESIGN" | jq -r '.upload_url')
+PUBLIC_URL=$(echo "$PRESIGN" | jq -r '.public_url')
+
+# Upload directly to presigned URL (bypasses server entirely)
+curl -s -X PUT "$UPLOAD_URL" \
+  -H "Content-Type: MIME_TYPE" \
+  --data-binary @/path/to/file
+```
+
+Determine the MIME type from the file extension:
+- `.jpg`, `.jpeg` → `image/jpeg`
+- `.png` → `image/png`
+- `.gif` → `image/gif`
+- `.webp` → `image/webp`
+- `.mp4` → `video/mp4`
+- `.mov` → `video/quicktime`
+- `.avi` → `video/x-msvideo`
+- `.webm` → `video/webm`
+
+Determine the media type from the MIME type:
+- Starts with `video/` → `video`
+- Otherwise → `image`
+
+Collect the `PUBLIC_URL`, type, and original filename for each uploaded file.
+
+#### Step 9b: Create Post
+
+If **media was uploaded**, use JSON with `media_urls`:
 
 ```bash
 curl -s -X POST "$PANDAS_API_URL/posts" \
   -H "Authorization: Bearer $PANDAS_API_KEY" \
   -H "Accept: application/json" \
-  -F "content=POST_CONTENT" \
-  -F "platforms[]=ACCOUNT_ID_1" \
-  -F "platforms[]=ACCOUNT_ID_2" \
-  -F "publish_now=true" \
-  -F "media[]=@/path/to/file.jpg"
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "POST_CONTENT",
+    "platforms": [ACCOUNT_ID_1, ACCOUNT_ID_2],
+    "publish_now": true,
+    "media_urls": [
+      {"url": "PUBLIC_URL_1", "type": "image", "original_filename": "photo.jpg"},
+      {"url": "PUBLIC_URL_2", "type": "video", "original_filename": "video.mp4"}
+    ]
+  }'
 ```
 
-Optional fields (add only when applicable):
-- `-F "title=VIDEO_TITLE"` — for YouTube
-- `-F "link_url=https://example.com"` — for Pinterest
-- `-F "scheduled_at=2026-03-16T09:00:00Z"` — for scheduled posts (omit `publish_now` or set to `false`)
-- `-F "timezone=America/New_York"` — timezone for scheduled posts
+If **no media**, use JSON without `media_urls`:
+
+```bash
+curl -s -X POST "$PANDAS_API_URL/posts" \
+  -H "Authorization: Bearer $PANDAS_API_KEY" \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "POST_CONTENT",
+    "platforms": [ACCOUNT_ID_1, ACCOUNT_ID_2],
+    "publish_now": true
+  }'
+```
+
+Optional fields (add to JSON when applicable):
+- `"title": "VIDEO_TITLE"` — for YouTube
+- `"link_url": "https://example.com"` — for Pinterest
+- `"scheduled_at": "2026-03-16T09:00:00Z"` — for scheduled posts (omit `publish_now` or set to `false`)
+- `"timezone": "America/New_York"` — timezone for scheduled posts
 
 **Response (201):**
 ```json
