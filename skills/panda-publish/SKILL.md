@@ -175,7 +175,11 @@ If files are found, list them (distinguishing images vs videos by extension) and
 
 Ask: "Publish now or schedule for later?"
 
-If scheduling, ask for the date and time. Accept natural language like "tomorrow at 9am" and convert to ISO 8601 format. Also ask for timezone if not obvious.
+If scheduling, ask for the date and time. Accept natural language like "tomorrow at 9am". Auto-detect the system timezone using:
+```bash
+readlink /etc/localtime | sed 's|.*/zoneinfo/||'
+```
+Use this value for the `"timezone"` field in the API payload. Do not ask the user for their timezone.
 
 ### Step 8: Confirmation Summary
 
